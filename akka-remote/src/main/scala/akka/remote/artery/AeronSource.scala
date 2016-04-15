@@ -40,7 +40,7 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
 
       println(s"# AeronSource $channel") // FIXME
 
-      private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(256))
+      private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(128 * 1024))
       private val streamId = 10
       private val sub = aeron().addSubscription(channel, streamId)
       private val running = new AtomicBoolean(true)

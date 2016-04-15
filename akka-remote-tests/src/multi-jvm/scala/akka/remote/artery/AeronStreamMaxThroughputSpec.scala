@@ -27,12 +27,6 @@ object AeronStreamMaxThroughputSpec extends MultiNodeConfig {
   val first = role("first")
   val second = role("second")
 
-  val hostname =
-    if (java.lang.Boolean.getBoolean("akka.test.multi-node"))
-      InetAddress.getLocalHost.getHostAddress // or InetAddress.getLocalHost.getHostName
-    else
-      "localhost"
-
   commonConfig(debugConfig(on = false).withFallback(
     ConfigFactory.parseString(s"""
        AeronStreamMaxThroughputSpec.totalMessagesFactor = 1.0
@@ -53,6 +47,11 @@ object AeronStreamMaxThroughputSpec extends MultiNodeConfig {
       case `first`  ⇒ 20511 // TODO yeah, we should have support for dynamic port assignment
       case `second` ⇒ 20512
     }
+
+  final case class TestSettings(
+    testName: String,
+    totalMessages: Long,
+    payloadSize: Int)
 
   def iterate(start: Long, end: Long): Iterator[Long] = new AbstractIterator[Long] {
     private[this] var first = true
@@ -89,7 +88,7 @@ abstract class AeronStreamMaxThroughputSpec
   lazy implicit val mat = ActorMaterializer()(system)
   import system.dispatcher
 
-  def totalMessages(n: Long): Long = (n * totalMessagesFactor).toLong
+  def adjustedTotalMessages(n: Long): Long = (n * totalMessagesFactor).toLong
 
   override def initialParticipants = roles.size
 
@@ -121,7 +120,8 @@ abstract class AeronStreamMaxThroughputSpec
       f"${1000.0 * total / d}%.03g msg/s, ${1000.0 * total * payloadSize / d}%.03g bytes/s")
   }
 
-  def test(testName: String, messages: Long, payloadSize: Int): Unit = {
+  def test(testSettings: TestSettings): Unit = {
+    import testSettings._
     val receiverName = testName + "-rcv"
 
     runOn(second) {
@@ -135,8 +135,8 @@ abstract class AeronStreamMaxThroughputSpec
           count += 1
           if (count == 1) {
             t0 = System.nanoTime()
-          } else if (count == messages) {
-            printTotal(testName, messages, "receive", t0, payloadSize)
+          } else if (count == totalMessages) {
+            printTotal(testName, totalMessages, "receive", t0, payloadSize)
             done.countDown()
           }
         }.onFailure {
@@ -155,10 +155,10 @@ abstract class AeronStreamMaxThroughputSpec
 
       val payload = ("0" * payloadSize).getBytes("utf-8")
       val t0 = System.nanoTime()
-      Source.fromIterator(() ⇒ iterate(1, messages))
+      Source.fromIterator(() ⇒ iterate(1, totalMessages))
         .map { n ⇒
-          if (n == messages) {
-            printTotal(testName, messages, "send", t0, payloadSize)
+          if (n == totalMessages) {
+            printTotal(testName, totalMessages, "send", t0, payloadSize)
           }
           payload
         }
@@ -171,11 +171,19 @@ abstract class AeronStreamMaxThroughputSpec
   }
 
   "Max throughput of Aeron Streams" must {
-    "be great for payloadSize = 100" in {
-      test(
-        testName = "AeronStreams-1",
-        messages = totalMessages(10000000),
-        payloadSize = 100)
+
+    val scenarios = List(
+      TestSettings(
+        testName = "AeronStreams-100",
+        totalMessages = adjustedTotalMessages(1000000),
+        payloadSize = 100),
+      TestSettings(
+        testName = "AeronStreams-1000",
+        totalMessages = adjustedTotalMessages(100000),
+        payloadSize = 1000))
+
+    for (s ← scenarios) {
+      s"be great for ${s.testName}, payloadSize = ${s.payloadSize}" in test(s)
     }
 
     // TODO add more tests

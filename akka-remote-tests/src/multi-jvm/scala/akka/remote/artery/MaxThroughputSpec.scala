@@ -22,7 +22,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
 
   val hostname =
     if (java.lang.Boolean.getBoolean("akka.test.multi-node"))
-      InetAddress.getLocalHost.getHostAddress // or InetAddress.getLocalHost.getHostName
+      InetAddress.getLocalHost.getHostName
     else
       "localhost"
 
@@ -63,7 +63,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
   }
 
   case object Run
-  sealed trait Echo
+  sealed trait Echo extends DeadLetterSuppression
   final case object Start extends Echo
   final case object End extends Echo
   final case class EndResult(totalReceived: Long)
@@ -90,11 +90,12 @@ object MaxThroughputSpec extends MultiNodeConfig {
     }
   }
 
-  def senderProps(target: ActorRef, totalMessages: Long, burstSize: Int, payloadSize: Int): Props =
-    Props(new Sender(target, totalMessages, burstSize, payloadSize))
+  def senderProps(target: ActorRef, testSettings: TestSettings): Props =
+    Props(new Sender(target, testSettings))
 
-  class Sender(target: ActorRef, totalMessages: Long, burstSize: Int, payloadSize: Int) extends Actor {
-    val payload = ("0" * payloadSize).getBytes("utf-8")
+  class Sender(target: ActorRef, testSettings: TestSettings) extends Actor {
+    import testSettings._
+    val payload = ("0" * testSettings.payloadSize).getBytes("utf-8")
     var startTime = 0L
     var remaining = totalMessages
     var maxRoundTripMillis = 0L
@@ -155,6 +156,12 @@ object MaxThroughputSpec extends MultiNodeConfig {
     }
   }
 
+  final case class TestSettings(
+    testName: String,
+    totalMessages: Long,
+    burstSize: Int,
+    payloadSize: Int)
+
 }
 
 class MaxThroughputSpecMultiJvmNode1 extends MaxThroughputSpec
@@ -168,7 +175,7 @@ abstract class MaxThroughputSpec
 
   val totalMessagesFactor = system.settings.config.getDouble("MaxThroughputSpec.totalMessagesFactor")
 
-  def totalMessages(n: Long): Long = (n * totalMessagesFactor).toLong
+  def adjustedTotalMessages(n: Long): Long = (n * totalMessagesFactor).toLong
 
   override def initialParticipants = roles.size
 
@@ -201,7 +208,8 @@ abstract class MaxThroughputSpec
     expectMsgType[ActorIdentity].ref.get
   }
 
-  def test(testName: String, messages: Long, burstSize: Int, payloadSize: Int): Unit = {
+  def test(testSettings: TestSettings): Unit = {
+    import testSettings._
     val receiverName = testName + "-rcv"
 
     runOn(second) {
@@ -215,7 +223,7 @@ abstract class MaxThroughputSpec
     runOn(first) {
       enterBarrier(receiverName + "-started")
       val receiver = identifyReceiver(receiverName)
-      val snd = system.actorOf(senderProps(receiver, messages, burstSize, payloadSize), testName + "-snd")
+      val snd = system.actorOf(senderProps(receiver, testSettings), testName + "-snd")
       watch(snd)
       snd ! Run
       expectTerminated(snd, 60.seconds * totalMessagesFactor)
@@ -226,20 +234,31 @@ abstract class MaxThroughputSpec
   }
 
   "Max throughput of Artery" must {
-    "be great for 1-to-1, burstSize = 1000, payloadSize = 100" in {
-      test(
-        testName = "1-to-1",
-        messages = totalMessages(1000000),
-        burstSize = 1000, // FIXME strange, we get much better throughput with 10000, why can't we exhaust the Source.queue?
-        payloadSize = 100)
-    }
 
-    "be great for 1-to-1, burstSize = 10000, payloadSize = 100" in {
-      test(
+    val scenarios = List(
+      TestSettings(
         testName = "1-to-1",
-        messages = totalMessages(1000000),
+        totalMessages = adjustedTotalMessages(1000000),
+        burstSize = 1000,
+        payloadSize = 100),
+      TestSettings(
+        testName = "1-to-1-large-burst",
+        totalMessages = adjustedTotalMessages(1000000),
         burstSize = 10000, // FIXME strange, we get much better throughput with 10000, why can't we exhaust the Source.queue?
-        payloadSize = 100)
+        payloadSize = 100),
+      TestSettings(
+        testName = "1-to-1-size-1k",
+        totalMessages = adjustedTotalMessages(100000),
+        burstSize = 1000,
+        payloadSize = 1000),
+      TestSettings(
+        testName = "1-to-1-size-10k",
+        totalMessages = adjustedTotalMessages(10000),
+        burstSize = 1000,
+        payloadSize = 10000))
+
+    for (s ← scenarios) {
+      s"be great for ${s.testName}, burstSize = ${s.burstSize}, payloadSize = ${s.payloadSize}" in test(s)
     }
 
     // TODO add more tests, such as 5-to-5 sender receiver pairs
