@@ -14,13 +14,20 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.remote.testkit.STMultiNodeSpec
 import akka.testkit._
 import com.typesafe.config.ConfigFactory
+import java.net.InetAddress
 
 object MaxThroughputSpec extends MultiNodeConfig {
   val first = role("first")
   val second = role("second")
 
+  val hostname =
+    if (java.lang.Boolean.getBoolean("akka.test.multi-node"))
+      InetAddress.getLocalHost.getHostAddress // or InetAddress.getLocalHost.getHostName
+    else
+      "localhost"
+
   commonConfig(debugConfig(on = false).withFallback(
-    ConfigFactory.parseString("""
+    ConfigFactory.parseString(s"""
        MaxThroughputSpec.totalMessagesFactor = 1.0
        akka {
          loglevel = INFO
@@ -30,7 +37,10 @@ object MaxThroughputSpec extends MultiNodeConfig {
            serialize-creators = false
            serialize-messages = false
          }
-         remote.artery.enabled = on
+         remote.artery {
+           enabled = on
+           hostname = "$hostname"
+         }
        }
        """)))
 
@@ -165,10 +175,8 @@ abstract class MaxThroughputSpec
   def remoteSettings = system.asInstanceOf[ExtendedActorSystem].provider.asInstanceOf[RemoteActorRefProvider].remoteSettings
 
   def address(roleName: RoleName): Address = {
-    if (remoteSettings.EnableArtery)
-      Address("akka.artery", system.name, node(second).address.host.get, aeronPort(roleName))
-    else
-      node(roleName).address
+    println(s"# $roleName -> ${node(roleName).address}") // FIXME
+    node(roleName).address
   }
 
   lazy val reporterExecutor = Executors.newFixedThreadPool(1)
@@ -189,15 +197,8 @@ abstract class MaxThroughputSpec
   }
 
   def identifyReceiver(name: String, r: RoleName = second): ActorRef = {
-    var ref: ActorRef = null
-    within(10.seconds) {
-      awaitAssert {
-        val p = TestProbe()
-        system.actorSelection(RootActorPath(address(r)) / "user" / name).tell(Identify(None), p.ref)
-        ref = p.expectMsgType[ActorIdentity].ref.get
-      }
-    }
-    ref
+    system.actorSelection(RootActorPath(address(r)) / "user" / name) ! Identify(None)
+    expectMsgType[ActorIdentity].ref.get
   }
 
   def test(testName: String, messages: Long, burstSize: Int, payloadSize: Int): Unit = {

@@ -38,6 +38,8 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new TimerGraphStageLogic(shape) with OutHandler {
 
+      println(s"# AeronSource $channel") // FIXME
+
       private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(256))
       private val streamId = 10
       private val sub = aeron().addSubscription(channel, streamId)

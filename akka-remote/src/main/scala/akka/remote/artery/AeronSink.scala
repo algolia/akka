@@ -34,6 +34,8 @@ class AeronSink(channel: String, aeron: () ⇒ Aeron) extends GraphStage[SinkSha
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new TimerGraphStageLogic(shape) with InHandler {
 
+      println(s"# AeronSink $channel") // FIXME
+
       private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(128 * 1024))
       private val streamId = 10
       private val pub = aeron().addPublication(channel, streamId)
