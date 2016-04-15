@@ -31,7 +31,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
        MaxThroughputSpec.totalMessagesFactor = 1.0
        akka {
          loglevel = INFO
-         testconductor.barrier-timeout = 60s
+         testconductor.barrier-timeout = 120s
          actor {
            provider = "akka.remote.RemoteActorRefProvider"
            serialize-creators = false
@@ -205,7 +205,7 @@ abstract class MaxThroughputSpec
     val receiverName = testName + "-rcv"
 
     runOn(second) {
-      val rep = reporter("1-to-1")
+      val rep = reporter(testName)
       val receiver = system.actorOf(receiverProps(rep, payloadSize), receiverName)
       enterBarrier(receiverName + "-started")
       enterBarrier(testName + "-done")
@@ -218,7 +218,7 @@ abstract class MaxThroughputSpec
       val snd = system.actorOf(senderProps(receiver, messages, burstSize, payloadSize), testName + "-snd")
       watch(snd)
       snd ! Run
-      expectTerminated(snd, 60.seconds)
+      expectTerminated(snd, 60.seconds * totalMessagesFactor)
       enterBarrier(testName + "-done")
     }
 
