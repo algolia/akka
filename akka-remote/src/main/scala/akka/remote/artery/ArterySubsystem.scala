@@ -113,7 +113,8 @@ private[remote] class Association(
 
   // Idempotent
   def associate(): Unit = {
-    queue = Source.queue(256, OverflowStrategy.dropBuffer).to(sink).run()(materializer)
+    if (queue eq null)
+      queue = Source.queue(256, OverflowStrategy.dropBuffer).to(sink).run()(materializer)
   }
 }
 
