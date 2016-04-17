@@ -29,7 +29,7 @@ import io.aeron.Aeron
  * INTERNAL API
  */
 // FIXME: Replace the codec with a custom made, hi-perf one
-private[remote] class Transport(
+private[akka] class Transport(
   val localAddress: Address,
   val system: ExtendedActorSystem,
   val materializer: Materializer,
