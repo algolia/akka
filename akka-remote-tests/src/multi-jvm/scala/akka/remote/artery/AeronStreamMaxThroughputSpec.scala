@@ -132,11 +132,7 @@ abstract class AeronStreamMaxThroughputSpec
     TestSettings(
       testName = "ThroughputAeronStreams-size-10k",
       totalMessages = adjustedTotalMessages(10000),
-      payloadSize = 10000),
-    TestSettings(
-      testName = "ThroughputAeronStreams-size-100k",
-      totalMessages = adjustedTotalMessages(1000),
-      payloadSize = 100000))
+      payloadSize = 10000))
 
   def test(testSettings: TestSettings): Unit = {
     import testSettings._
@@ -147,7 +143,7 @@ abstract class AeronStreamMaxThroughputSpec
       var t0 = System.nanoTime()
       var count = 0L
       val done = TestLatch(1)
-      Source.fromGraph(new AeronSource(channel(second), () ⇒ aeron))
+      Source.fromGraph(new AeronSource(channel(second), aeron))
         .runForeach { bytes ⇒
           rep.onMessage(1, bytes.length)
           count += 1
@@ -180,7 +176,7 @@ abstract class AeronStreamMaxThroughputSpec
           }
           payload
         }
-        .runWith(new AeronSink(channel(second), () ⇒ aeron))
+        .runWith(new AeronSink(channel(second), aeron))
 
       enterBarrier(testName + "-done")
     }

@@ -74,7 +74,7 @@ private[akka] class Transport(
   }
 
   def start(): Unit = {
-    Source.fromGraph(new AeronSource(inboundChannel, () ⇒ aeron))
+    Source.fromGraph(new AeronSource(inboundChannel, aeron))
       .map(ByteString.apply) // TODO we should use ByteString all the way
       .via(inboundFlow)
       .runWith(Sink.ignore)
@@ -93,7 +93,7 @@ private[akka] class Transport(
     Flow.fromGraph(killSwitch.flow[Send])
       .via(encoder)
       .map(_.toArray) // TODO we should use ByteString all the way
-      .to(new AeronSink(outboundChannel, () ⇒ aeron))
+      .to(new AeronSink(outboundChannel, aeron))
   }
 
   // TODO: Try out parallelized serialization (mapAsync) for performance

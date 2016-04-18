@@ -144,7 +144,7 @@ abstract class AeronStreamLatencySpec
       val rep = reporter(testName)
       val barrier = new CyclicBarrier(2)
       val count = new AtomicInteger
-      Source.fromGraph(new AeronSource(channel(first), () ⇒ aeron))
+      Source.fromGraph(new AeronSource(channel(first), aeron))
         .runForeach { bytes ⇒
           if (bytes.length != payloadSize) throw new IllegalArgumentException("Invalid message")
           rep.onMessage(1, payloadSize)
@@ -171,7 +171,7 @@ abstract class AeronStreamLatencySpec
             sendTimes.set(n - 1, System.nanoTime())
             payload
           }
-          .runWith(new AeronSink(channel(second), () ⇒ aeron))
+          .runWith(new AeronSink(channel(second), aeron))
 
         barrier.await((totalMessages / messageRate) + 5, SECONDS)
       }
@@ -187,8 +187,8 @@ abstract class AeronStreamLatencySpec
     "start echo" in {
       runOn(second) {
         // just echo back on
-        Source.fromGraph(new AeronSource(channel(second), () ⇒ aeron))
-          .runWith(new AeronSink(channel(first), () ⇒ aeron))
+        Source.fromGraph(new AeronSource(channel(second), aeron))
+          .runWith(new AeronSink(channel(first), aeron))
       }
       enterBarrier("echo-started")
     }

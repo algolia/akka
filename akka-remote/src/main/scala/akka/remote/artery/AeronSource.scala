@@ -30,7 +30,7 @@ object AeronSource {
 /**
  * @param channel eg. "aeron:udp?endpoint=localhost:40123"
  */
-class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[SourceShape[AeronSource.Bytes]] {
+class AeronSource(channel: String, aeron: Aeron) extends GraphStage[SourceShape[AeronSource.Bytes]] {
   import AeronSource._
 
   val out: Outlet[Bytes] = Outlet("AeronSource")
@@ -43,7 +43,7 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
 
       private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(128 * 1024))
       private val streamId = 10
-      private val sub = aeron().addSubscription(channel, streamId)
+      private val sub = aeron.addSubscription(channel, streamId)
       private val running = new AtomicBoolean(true)
       private val idleStrategy = new BackoffIdleStrategy(
         1000, 10, TimeUnit.MICROSECONDS.toNanos(1), TimeUnit.MICROSECONDS.toNanos(100))

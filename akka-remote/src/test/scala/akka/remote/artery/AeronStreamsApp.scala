@@ -116,7 +116,7 @@ object AeronStreamsApp {
     var t0 = System.nanoTime()
     var count = 0L
     var payloadSize = 0L
-    Source.fromGraph(new AeronSource(channel1, () ⇒ aeron))
+    Source.fromGraph(new AeronSource(channel1, aeron))
       .map { bytes ⇒
         r.onMessage(1, bytes.length)
         bytes
@@ -154,19 +154,19 @@ object AeronStreamsApp {
         r.onMessage(1, payload.length)
         payload
       }
-      .runWith(new AeronSink(channel1, () ⇒ aeron))
+      .runWith(new AeronSink(channel1, aeron))
   }
 
   def runEchoReceiver(): Unit = {
     // just echo back on channel2
     reporterExecutor.execute(reporter)
     val r = reporter
-    Source.fromGraph(new AeronSource(channel1, () ⇒ aeron))
+    Source.fromGraph(new AeronSource(channel1, aeron))
       .map { bytes ⇒
         r.onMessage(1, bytes.length)
         bytes
       }
-      .runWith(new AeronSink(channel2, () ⇒ aeron))
+      .runWith(new AeronSink(channel2, aeron))
   }
 
   def runEchoSender(): Unit = {
@@ -178,7 +178,7 @@ object AeronStreamsApp {
     var repeat = 3
     val count = new AtomicInteger
     var t0 = System.nanoTime()
-    Source.fromGraph(new AeronSource(channel2, () ⇒ aeron))
+    Source.fromGraph(new AeronSource(channel2, aeron))
       .map { bytes ⇒
         r.onMessage(1, bytes.length)
         bytes
@@ -213,7 +213,7 @@ object AeronStreamsApp {
           sendTimes.set(n - 1, System.nanoTime())
           payload
         }
-        .runWith(new AeronSink(channel1, () ⇒ aeron))
+        .runWith(new AeronSink(channel1, aeron))
 
       barrier.await()
     }
@@ -223,7 +223,7 @@ object AeronStreamsApp {
 
   def runDebugReceiver(): Unit = {
     import system.dispatcher
-    Source.fromGraph(new AeronSource(channel1, () ⇒ aeron))
+    Source.fromGraph(new AeronSource(channel1, aeron))
       .map(bytes ⇒ new String(bytes, "utf-8"))
       .runForeach { s ⇒
         println(s)
@@ -243,7 +243,7 @@ object AeronStreamsApp {
         println(s)
         s.getBytes("utf-8")
       }
-      .runWith(new AeronSink(channel1, () ⇒ aeron))
+      .runWith(new AeronSink(channel1, aeron))
   }
 
 }

@@ -25,7 +25,7 @@ object AeronSink {
 /**
  * @param channel eg. "aeron:udp?endpoint=localhost:40123"
  */
-class AeronSink(channel: String, aeron: () ⇒ Aeron) extends GraphStage[SinkShape[AeronSink.Bytes]] {
+class AeronSink(channel: String, aeron: Aeron) extends GraphStage[SinkShape[AeronSink.Bytes]] {
   import AeronSink._
 
   val in: Inlet[Bytes] = Inlet("AeronSink")
@@ -38,7 +38,7 @@ class AeronSink(channel: String, aeron: () ⇒ Aeron) extends GraphStage[SinkSha
 
       private val buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(128 * 1024))
       private val streamId = 10
-      private val pub = aeron().addPublication(channel, streamId)
+      private val pub = aeron.addPublication(channel, streamId)
       private val idleStrategy = new BackoffIdleStrategy(
         100, 10, TimeUnit.MICROSECONDS.toNanos(1), TimeUnit.MICROSECONDS.toNanos(100))
       private val retries = 120
