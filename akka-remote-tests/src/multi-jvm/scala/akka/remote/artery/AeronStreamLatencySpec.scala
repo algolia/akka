@@ -146,7 +146,8 @@ abstract class AeronStreamLatencySpec
       val count = new AtomicInteger
       Source.fromGraph(new AeronSource(channel(first), () ⇒ aeron))
         .runForeach { bytes ⇒
-          rep.onMessage(1, bytes.length)
+          if (bytes.length != payloadSize) throw new IllegalArgumentException("Invalid message")
+          rep.onMessage(1, payloadSize)
           val c = count.incrementAndGet()
           val d = System.nanoTime() - sendTimes.get(c - 1)
           if (c % (totalMessages / 10) == 0)

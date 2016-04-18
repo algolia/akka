@@ -15,6 +15,7 @@ import akka.stream.stage.GraphStageLogic
 import akka.stream.stage.OutHandler
 import akka.stream.stage.TimerGraphStageLogic
 import io.aeron.Aeron
+import io.aeron.FragmentAssembler
 import io.aeron.logbuffer.FragmentHandler
 import io.aeron.logbuffer.Header
 import org.agrona.DirectBuffer
@@ -50,18 +51,17 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
       private var backoffCount = idleStrategyRetries
       private val backoffDuration1 = 1.millis
       private val backoffDuration2 = 50.millis
+      private var messageReceived = false
 
-      val receiveMessage = getAsyncCallback[Bytes] { data ⇒
-        push(out, data)
-      }
-
-      val fragmentHandler: FragmentHandler = new FragmentHandler {
+      // the fragmentHandler is called from `poll` in same thread, i.e. no async callback is needed
+      val fragmentHandler = new FragmentAssembler(new FragmentHandler {
         override def onFragment(buffer: DirectBuffer, offset: Int, length: Int, header: Header): Unit = {
+          messageReceived = true
           val data = Array.ofDim[Byte](length)
           buffer.getBytes(offset, data);
-          receiveMessage.invoke(data)
+          push(out, data)
         }
-      }
+      })
 
       override def postStop(): Unit = {
         running.set(false)
@@ -77,8 +77,13 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
 
       @tailrec private def subscriberLoop(): Unit =
         if (running.get) {
+          messageReceived = false // will be set by the fragmentHandler if got full msg
+          // we only poll 1 fragment, otherwise we would have to use another buffer for
+          // received messages that can't be pushed
           val fragmentsRead = sub.poll(fragmentHandler, 1)
-          if (fragmentsRead <= 0) {
+          if (fragmentsRead > 0 && !messageReceived)
+            subscriberLoop() // recursive, read more fragments
+          else if (fragmentsRead <= 0) {
             // TODO the backoff strategy should be measured and tuned
             backoffCount -= 1
             if (backoffCount > 0) {

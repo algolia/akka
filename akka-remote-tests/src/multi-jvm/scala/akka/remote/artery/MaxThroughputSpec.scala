@@ -77,7 +77,8 @@ object MaxThroughputSpec extends MultiNodeConfig {
         context.stop(self)
       case m: Echo ⇒
         sender() ! m
-      case _ ⇒
+      case msg: Array[Byte] ⇒
+        if (msg.length != payloadSize) throw new IllegalArgumentException("Invalid message")
         reporter.onMessage(1, payloadSize)
         c += 1
     }

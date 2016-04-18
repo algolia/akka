@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.atomic.AtomicLongArray
 import akka.stream.ThrottleMode
+import org.agrona.ErrorHandler
 
 object AeronStreamsApp {
 
@@ -30,6 +31,12 @@ object AeronStreamsApp {
 
   lazy val aeron = {
     val ctx = new Aeron.Context
+    ctx.errorHandler(new ErrorHandler {
+      override def onError(cause: Throwable) {
+        println(s"# Aeron onError " + cause) // FIXME
+        cause.printStackTrace()
+      }
+    })
     val driver = MediaDriver.launchEmbedded()
     ctx.aeronDirectoryName(driver.aeronDirectoryName)
     Aeron.connect(ctx)

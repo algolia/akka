@@ -24,6 +24,10 @@ import akka.event.LoggingAdapter
 import akka.event.Logging
 import io.aeron.driver.MediaDriver
 import io.aeron.Aeron
+import org.agrona.ErrorHandler
+import io.aeron.AvailableImageHandler
+import io.aeron.Image
+import io.aeron.UnavailableImageHandler
 
 /**
  * INTERNAL API
@@ -45,6 +49,24 @@ private[akka] class Transport(
 
   private val aeron = {
     val ctx = new Aeron.Context
+    ctx.availableImageHandler(new AvailableImageHandler {
+      override def onAvailableImage(img: Image): Unit = {
+        if (log.isDebugEnabled)
+          log.debug(s"onAvailableImage from ${img.sourceIdentity} session ${img.sessionId}")
+      }
+    })
+    ctx.unavailableImageHandler(new UnavailableImageHandler {
+      override def onUnavailableImage(img: Image): Unit = {
+        if (log.isDebugEnabled)
+          log.debug(s"onUnavailableImage from ${img.sourceIdentity} session ${img.sessionId}")
+        // FIXME we should call FragmentAssembler.freeSessionBuffer when image is unavailable
+      }
+    })
+    ctx.errorHandler(new ErrorHandler {
+      override def onError(cause: Throwable) {
+        log.error(cause, s"Aeron error, ${cause.getMessage}")
+      }
+    })
     // TODO also support external media driver
     val driver = MediaDriver.launchEmbedded()
     ctx.aeronDirectoryName(driver.aeronDirectoryName)

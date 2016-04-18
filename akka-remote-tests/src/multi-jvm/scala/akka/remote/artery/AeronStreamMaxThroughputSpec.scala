@@ -128,7 +128,15 @@ abstract class AeronStreamMaxThroughputSpec
     TestSettings(
       testName = "ThroughputAeronStreams-size-1k",
       totalMessages = adjustedTotalMessages(100000),
-      payloadSize = 1000))
+      payloadSize = 1000),
+    TestSettings(
+      testName = "ThroughputAeronStreams-size-10k",
+      totalMessages = adjustedTotalMessages(10000),
+      payloadSize = 10000),
+    TestSettings(
+      testName = "ThroughputAeronStreams-size-100k",
+      totalMessages = adjustedTotalMessages(1000),
+      payloadSize = 100000))
 
   def test(testSettings: TestSettings): Unit = {
     import testSettings._
