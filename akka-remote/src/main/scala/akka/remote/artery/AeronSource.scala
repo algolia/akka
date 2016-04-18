@@ -45,9 +45,11 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
       private val sub = aeron().addSubscription(channel, streamId)
       private val running = new AtomicBoolean(true)
       private val idleStrategy = new BackoffIdleStrategy(
-        100, 10, TimeUnit.MICROSECONDS.toNanos(1), TimeUnit.MICROSECONDS.toNanos(100))
-      private val retries = 115
-      private var backoffCount = retries
+        1000, 10, TimeUnit.MICROSECONDS.toNanos(1), TimeUnit.MICROSECONDS.toNanos(100))
+      private val idleStrategyRetries = 1020
+      private var backoffCount = idleStrategyRetries
+      private val backoffDuration1 = 1.millis
+      private val backoffDuration2 = 50.millis
 
       val receiveMessage = getAsyncCallback[Bytes] { data ⇒
         push(out, data)
@@ -69,7 +71,7 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
       // OutHandler
       override def onPull(): Unit = {
         idleStrategy.reset()
-        backoffCount = retries
+        backoffCount = idleStrategyRetries
         subscriberLoop()
       }
 
@@ -78,20 +80,18 @@ class AeronSource(channel: String, aeron: () ⇒ Aeron) extends GraphStage[Sourc
           val fragmentsRead = sub.poll(fragmentHandler, 1)
           if (fragmentsRead <= 0) {
             // TODO the backoff strategy should be measured and tuned
-            if (backoffCount <= 0) {
+            backoffCount -= 1
+            if (backoffCount > 0) {
+              idleStrategy.idle()
+              subscriberLoop() // recursive
+            } else if (backoffCount > -1000) {
               // TODO Instead of using the scheduler we should handoff the task of
               // retrying/polling to a separate thread that performs the polling for
               // all sources/sinks and notifies back when there is some news.
               // println(s"# scheduled backoff ${0 - backoffCount + 1}") // FIXME
-              backoffCount -= 1
-              if (backoffCount <= -5)
-                scheduleOnce(Backoff, 50.millis)
-              else
-                scheduleOnce(Backoff, 1.millis)
+              scheduleOnce(Backoff, backoffDuration1)
             } else {
-              idleStrategy.idle()
-              backoffCount -= 1
-              subscriberLoop() // recursive
+              scheduleOnce(Backoff, backoffDuration2)
             }
           }
         }

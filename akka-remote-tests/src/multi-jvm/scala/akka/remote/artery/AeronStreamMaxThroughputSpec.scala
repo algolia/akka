@@ -120,6 +120,16 @@ abstract class AeronStreamMaxThroughputSpec
       f"${1000.0 * total / d}%.03g msg/s, ${1000.0 * total * payloadSize / d}%.03g bytes/s")
   }
 
+  val scenarios = List(
+    TestSettings(
+      testName = "ThroughputAeronStreams-size-100",
+      totalMessages = adjustedTotalMessages(1000000),
+      payloadSize = 100),
+    TestSettings(
+      testName = "ThroughputAeronStreams-size-1k",
+      totalMessages = adjustedTotalMessages(100000),
+      payloadSize = 1000))
+
   def test(testSettings: TestSettings): Unit = {
     import testSettings._
     val receiverName = testName + "-rcv"
@@ -171,16 +181,6 @@ abstract class AeronStreamMaxThroughputSpec
   }
 
   "Max throughput of Aeron Streams" must {
-
-    val scenarios = List(
-      TestSettings(
-        testName = "AeronStreams-100",
-        totalMessages = adjustedTotalMessages(1000000),
-        payloadSize = 100),
-      TestSettings(
-        testName = "AeronStreams-1000",
-        totalMessages = adjustedTotalMessages(100000),
-        payloadSize = 1000))
 
     for (s ← scenarios) {
       s"be great for ${s.testName}, payloadSize = ${s.payloadSize}" in test(s)

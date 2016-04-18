@@ -35,10 +35,6 @@ object MaxThroughputSpec extends MultiNodeConfig {
            enabled = on
          }
        }
-       # FIXME this is to make it work with multi-node tests, which overrides
-       # the netty hostname with system property
-       akka.remote.netty.tcp.hostname = localhost
-       akka.remote.artery.hostname = $${akka.remote.netty.tcp.hostname}
        """)))
 
   def aeronPort(roleName: RoleName): Int =
@@ -206,6 +202,38 @@ abstract class MaxThroughputSpec
     expectMsgType[ActorIdentity].ref.get
   }
 
+  val scenarios = List(
+    TestSettings(
+      testName = "1-to-1",
+      totalMessages = adjustedTotalMessages(1000000),
+      burstSize = 1000,
+      payloadSize = 100,
+      senderReceiverPairs = 1),
+    TestSettings(
+      testName = "1-to-1-large-burst",
+      totalMessages = adjustedTotalMessages(1000000),
+      burstSize = 10000, // FIXME strange, we get much better throughput with 10000, why can't we exhaust the Source.queue?
+      payloadSize = 100,
+      senderReceiverPairs = 1),
+    TestSettings(
+      testName = "1-to-1-size-1k",
+      totalMessages = adjustedTotalMessages(100000),
+      burstSize = 1000,
+      payloadSize = 1000,
+      senderReceiverPairs = 1),
+    TestSettings(
+      testName = "1-to-1-size-10k",
+      totalMessages = adjustedTotalMessages(10000),
+      burstSize = 1000,
+      payloadSize = 10000,
+      senderReceiverPairs = 1),
+    TestSettings(
+      testName = "5-to-5",
+      totalMessages = adjustedTotalMessages(100000),
+      burstSize = 1000,
+      payloadSize = 100,
+      senderReceiverPairs = 5))
+
   def test(testSettings: TestSettings): Unit = {
     import testSettings._
     val receiverName = testName + "-rcv"
@@ -242,38 +270,6 @@ abstract class MaxThroughputSpec
   }
 
   "Max throughput of Artery" must {
-
-    val scenarios = List(
-      TestSettings(
-        testName = "1-to-1",
-        totalMessages = adjustedTotalMessages(1000000),
-        burstSize = 1000,
-        payloadSize = 100,
-        senderReceiverPairs = 1),
-      TestSettings(
-        testName = "1-to-1-large-burst",
-        totalMessages = adjustedTotalMessages(1000000),
-        burstSize = 10000, // FIXME strange, we get much better throughput with 10000, why can't we exhaust the Source.queue?
-        payloadSize = 100,
-        senderReceiverPairs = 1),
-      TestSettings(
-        testName = "1-to-1-size-1k",
-        totalMessages = adjustedTotalMessages(100000),
-        burstSize = 1000,
-        payloadSize = 1000,
-        senderReceiverPairs = 1),
-      TestSettings(
-        testName = "1-to-1-size-10k",
-        totalMessages = adjustedTotalMessages(10000),
-        burstSize = 1000,
-        payloadSize = 10000,
-        senderReceiverPairs = 1),
-      TestSettings(
-        testName = "5-to-5",
-        totalMessages = adjustedTotalMessages(100000),
-        burstSize = 1000,
-        payloadSize = 100,
-        senderReceiverPairs = 5))
 
     for (s ← scenarios) {
       s"be great for ${s.testName}, burstSize = ${s.burstSize}, payloadSize = ${s.payloadSize}" in test(s)
